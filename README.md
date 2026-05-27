@@ -12,6 +12,28 @@ No paid APIs. Everything runs on your own machine with Docker.
 
 ## Architecture
 
+```
+Telegram voice memo
+        │
+        ▼
+ ┌──────────────┐   binary    ┌─────────────────┐   text   ┌──────────────────┐
+ │  Telegram    │ ──────────► │  faster-whisper │ ───────► │   Ollama (LLM)   │
+ │  Trigger     │             │  (transcribe)   │          │ title/labels/sum │
+ └──────────────┘             └─────────────────┘          └──────────────────┘
+                                                                     │ JSON
+                                                                     ▼
+                                                            ┌──────────────────┐
+                                                            │  Create Todoist  │
+                                                            │      task        │
+                                                            └──────────────────┘
+                                                                     │
+                                                                     ▼
+                                                            Telegram confirmation
+```
+
+<details>
+<summary>Same diagram, rendered as a graph (GitHub)</summary>
+
 ```mermaid
 flowchart LR
     A([🎙️ Telegram<br/>voice memo]) --> B[Telegram Trigger]
@@ -29,7 +51,9 @@ flowchart LR
     class F,G sink;
 ```
 
-> Rendered automatically by GitHub. Blue = capture, amber = AI enrichment, green = write-back / notify.
+</details>
+
+> Blue = capture, amber = AI enrichment, green = write-back / notify.
 
 ## The real point: automating task flows
 
