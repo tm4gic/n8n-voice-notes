@@ -1,0 +1,130 @@
+{
+  "name": "Voice Notes -> Todoist (local Whisper + Ollama)",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": ["message"]
+      },
+      "id": "trigger-telegram",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300],
+      "webhookId": "voice-notes-webhook"
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{ $json.message.voice.file_id }}"
+      },
+      "id": "download-voice",
+      "name": "Download Voice File",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://faster-whisper:8000/v1/audio/transcriptions",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            },
+            {
+              "name": "model",
+              "value": "Systran/faster-whisper-base.en"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "whisper-transcribe",
+      "name": "Transcribe (Whisper)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://ollama:11434/api/chat",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  model: 'llama3.1:8b',\n  stream: false,\n  format: 'json',\n  messages: [\n    { role: 'system', content: 'You organize voice memos. Return ONLY valid JSON with keys: title (short string), labels (array of 1-3 lowercase strings chosen from: idea, todo, work, personal, follow-up, note), summary (2-3 sentence string).' },\n    { role: 'user', content: $json.text }\n  ]\n}) }}",
+        "options": {}
+      },
+      "id": "ollama-organize",
+      "name": "Title/Labels/Summary (Ollama)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Ollama returns the model output as a JSON string in message.content\nconst parsed = JSON.parse($json.message.content);\nreturn [{\n  json: {\n    title: parsed.title || 'Untitled voice note',\n    labels: Array.isArray(parsed.labels) ? parsed.labels : [],\n    summary: parsed.summary || ''\n  }\n}];"
+      },
+      "id": "parse-json",
+      "name": "Parse Model Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "content": "={{ $json.title }}",
+        "description": "={{ $json.summary }}",
+        "labels": "={{ $json.labels }}",
+        "options": {}
+      },
+      "id": "create-task",
+      "name": "Create Todoist Task",
+      "type": "n8n-nodes-base.todoist",
+      "typeVersion": 2.1,
+      "position": [1340, 300]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "=Saved \"{{ $('Parse Model Output').item.json.title }}\" to Todoist.",
+        "additionalFields": {}
+      },
+      "id": "confirm-telegram",
+      "name": "Confirm in Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1560, 300]
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": {
+      "main": [[{ "node": "Download Voice File", "type": "main", "index": 0 }]]
+    },
+    "Download Voice File": {
+      "main": [[{ "node": "Transcribe (Whisper)", "type": "main", "index": 0 }]]
+    },
+    "Transcribe (Whisper)": {
+      "main": [[{ "node": "Title/Labels/Summary (Ollama)", "type": "main", "index": 0 }]]
+    },
+    "Title/Labels/Summary (Ollama)": {
+      "main": [[{ "node": "Parse Model Output", "type": "main", "index": 0 }]]
+    },
+    "Parse Model Output": {
+      "main": [[{ "node": "Create Todoist Task", "type": "main", "index": 0 }]]
+    },
+    "Create Todoist Task": {
+      "main": [[{ "node": "Confirm in Telegram", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templatecredsSetupCompleted": false
+  }
+}

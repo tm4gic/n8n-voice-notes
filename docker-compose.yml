@@ -1,0 +1,52 @@
+services:
+  # Workflow engine — UI at http://localhost:5678
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - GENERIC_TIMEZONE=America/New_York
+      # Allow the Code node to run if you extend the parser
+      - NODE_FUNCTION_ALLOW_BUILTIN=*
+    volumes:
+      - n8n_data:/home/node/.n8n
+    depends_on:
+      - ollama
+      - faster-whisper
+
+  # Local LLM (title / labels / summary) — replaces GPT-4o
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    # For NVIDIA GPU acceleration, uncomment:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+  # Local Whisper transcription with an OpenAI-compatible API
+  faster-whisper:
+    image: fedirz/faster-whisper-server:latest-cpu
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - whisper_data:/root/.cache/huggingface
+    environment:
+      - WHISPER__MODEL=Systran/faster-whisper-base.en
+
+volumes:
+  n8n_data:
+  ollama_data:
+  whisper_data:
