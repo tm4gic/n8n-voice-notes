@@ -1,0 +1,6 @@
+.env
+*.local
+.DS_Store
+n8n_data/
+ollama_data/
+whisper_data/
